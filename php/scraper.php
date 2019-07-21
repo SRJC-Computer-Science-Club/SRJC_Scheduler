@@ -12,7 +12,7 @@ mysql_select_db('SRJC');
 $search = mysql_real_escape_string($_GET["cls"]);
 //echo $search;
 
-$result = mysql_query("SELECT DISTINCT  `URL` FROM  `F16` WHERE Courses =  '$search'");
+$result = mysql_query("SELECT DISTINCT  `URL` FROM  `F19` WHERE Courses =  '$search'");
 
 if (!$result ) {
 	echo "A Server Error Occured";
@@ -35,19 +35,19 @@ $result = curl_exec($ch);
 
 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 if (preg_match("/(404|500)/", $http_code) === 1) {
-	
-	$result = mysql_query("SELECT DISTINCT  `INFO` FROM  `F16` WHERE Courses =  '$search'");
-	
+
+	$result = mysql_query("SELECT DISTINCT  `INFO` FROM  `F19` WHERE Courses =  '$search'");
+
 	if (!$result ) {
 		echo "A Server Error Occured";
 		exit();
 	}
-	
+
 	if ( mysql_num_rows($result)==0 ) {
 		echo "Course Not Found";
 		exit();
 	}
-	
+
 	echo mysql_result($result, 0);
 	exit();
 }
@@ -96,7 +96,7 @@ echo $class;
 
 $class = mysql_real_escape_string( $class );
 
-$sql = "REPLACE INTO F16 ".
+$sql = "REPLACE INTO F19 ".
 		"VALUES('$search','$url','$class') ";
 
 mysql_query( $sql , $con );
