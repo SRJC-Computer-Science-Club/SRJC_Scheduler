@@ -59,7 +59,6 @@ $( function() // document has been loaded
 
 
 
-
 	function Redraw( ifPrint )
 	{
 
@@ -643,18 +642,59 @@ $( function() // document has been loaded
 	}
 
 
+	function AppendGTCCourses()
+	{
+		$.ajax(
+			{
+				url : 'http://srjcscheduler.com/php/gtc-scraper.php' ,
+				data :
+				{
+				},
+				timeout : 8000 ,
+				complete : function( response )
+				{
+					var gtcCourses = String(response.responseText).split( "," );
+
+					console.log(gtcCourses);
+
+					COURSE_TITLES = COURSE_TITLES.concat(gtcCourses);
+
+				}
+			}
+		);
+	}
+
+
 	function RequestClassData( classTitle )
 	{
-		classTitle = classTitle.toUpperCase();
+		var SRJC = 0;
+		var GTC = 1;
 
-		if ( classTitle.length < 10 )
+		var courseType = SRJC;
+		var regexp = '/GtC/';
+
+		if( classTitle.match("GtC") ) // then is gtc course
+			courseType = GTC;
+
+		var url_string = 'http://srjcscheduler.com/php/scraper.php';
+
+		if (courseType == GTC )
 		{
-			classTitle = classTitle.replace( /([A-Z])(\d)/,'$1 $2');
+			url_string = 'http://srjcscheduler.com/php/gtc.php';
+		}
+		else
+		{
+			classTitle = classTitle.toUpperCase();
+
+			if ( classTitle.length < 10 )
+			{
+				classTitle = classTitle.replace( /([A-Z])(\d)/,'$1 $2');
+			}
 		}
 
 		$.ajax(
 		{
-		url : 'http://srjcscheduler.com/php/scraper.php' ,
+		url : url_string ,
 		beforeSend: function()
 		{
 			$('#loader').hide();
@@ -681,7 +721,12 @@ $( function() // document has been loaded
 				//var title = courseText.match( /\t[A-Z]{2,7}[ ]*\d[A-Z0-9.]{0,6}\t/ )[ 0 ].trim();
 				//var title = FormatCourseTitle( classTitle )
 				console.log( courseText );
-				courseText = ParseCourseClassesAlt( courseText );
+
+							if (courseType == GTC )
+						courseText = ParseCourseClassesAlt2( courseText );
+				else
+						courseText = ParseCourseClassesAlt( courseText );
+
 				console.log( courseText );
 				AddCourse( courseText , classTitle );
 			}
@@ -970,7 +1015,7 @@ $( function() // document has been loaded
 
 				// sect number //////////////////////////////////////////////////////////////////////////////
 
-				classTemp.sect = courseText[ i ].match( /\d{4}/ )[ 0 ]; // pull sect number
+				classTemp.sect =  courseText[ i ].match( /<?(.*?)(>|\t)/ )[ 1 ]; // pull until next tab
 
 				courseText[ i ] = courseText[ i ].replace( /.*?(>|\t)/ , "" ); // remove sect number
 
@@ -1113,11 +1158,11 @@ $( function() // document has been loaded
 
 						min = Number( stringTemp.match( /\d\d/ )[ 0 ] ); // parses start minutes
 
-						stringTemp = stringTemp.replace( /.*?\s/ , "" ); // removes start minutes
+						stringTemp = stringTemp.replace( /\d\d\s?/ , "" ); // removes start minutes
 
 						ampm = stringTemp.match( /\s*?[amp]{2}/ )[ 0 ]; // parses start am or pm
 
-						stringTemp = stringTemp.replace( /\s\-\s/ , "" ); // removes start am or pm
+						stringTemp = stringTemp.replace( /\s?\-\s?/ , "" ); // removes start am or pm
 
 						if ( ampm.toLowerCase() == "pm" ) // if pm
 						{
@@ -1145,7 +1190,7 @@ $( function() // document has been loaded
 
 						min = Number( stringTemp.match( /\d\d/ )[ 0 ] );
 
-						stringTemp = stringTemp.replace( /.*?\s/ , "" );
+						stringTemp = stringTemp.replace( /\d\d\s?/ , "" );
 
 						ampm = stringTemp.match( /\s*?[amp]{2}/ )[ 0 ];
 
@@ -1403,7 +1448,7 @@ $( function() // document has been loaded
 
 					// final exam //////////////////////////////////////////////////////////////////////////////
 
-					classTemp.finalExam = stringTemp.match( /\d\d?\/\d\d?\/\d{4}/ )[ 0 ]; // parse final exam and assing to class
+					classTemp.finalExam = stringTemp; // parse final exam and assing to class
 				} catch ( err ) // if final exam missing
 				{
 					console.log( "error adding final exam date" );
@@ -1741,10 +1786,13 @@ $( function() // document has been loaded
 
 		//console.log( obj.sect + " - " + obj.sessions[ 0 ].instructor );
 
-		for ( var j = 0 ; j < obj.parent.data( "course" ).classes.length ; j++ )
+		if( !obj.parent.data( "course" ).courseTitle.match("GtC") )
 		{
-			obj.parent.data( "course" ).classes[ j ].display = false;
-			obj.parent.data( "course" ).classes[ j ].RefreshColor();
+			for ( var j = 0 ; j < obj.parent.data( "course" ).classes.length ; j++ )
+			{
+				obj.parent.data( "course" ).classes[ j ].display = false;
+				obj.parent.data( "course" ).classes[ j ].RefreshColor();
+			}
 		}
 
 		obj.display = tempDisplay;
@@ -2369,6 +2417,21 @@ $( function() // document has been loaded
 
 
 
+	function ParseCourseClassesAlt2( courseText )
+	{
+		courseText = courseText.trim();
+		courseText = "<" + courseText;
+		courseText = courseText.replace( /\n/g , "" );
+		courseText = courseText.replace( /\r/g , "" );
+		courseText = courseText.replace( /\$\^\$/gm , "><" );
+		//courseText = courseText.replace( /.*?>/ , "" );
+		courseText += ">";
+		//courseText = courseText.replace( /<[A-Z]{2,7}[ ]*\d[A-Z0-9.]{0,6}\t/g , "<" );
+
+		courseText = courseText.match( /<(.*?)>/gm );
+		return courseText;
+	}
+
 
 
 	setTimeout( Redraw , 200 );
@@ -2381,8 +2444,9 @@ $( function() // document has been loaded
 
 
 	var COURSE_TITLES = [
-		"APE 301", "APE 701", "APE 709", "APE 710", "DH 68", "DH 69", "DH 70", "DH 71A", "DH 71D", "DH 79", "DH 80", "DH 81", "KTEAM 4.1", "KTEAM 4.2", "KTEAM 4.3", "KTEAM 6.1", "KTEAM 6.2", "KTEAM 8.1", "KTEAM 8.2", "KTEAM 8.3", "AJ 21", "AJ 22", "AJ 25", "AJ 53", "AJ 54A", "AJ 55", "AJ 56", "AJ 99I", "AJ 203", "AJ 222C", "AJ 223", "AJ 305", "AJ 343", "AJ 348", "AJ 350", "AJ 351", "AJ 353", "AJ 354", "AJ 355", "AJ 361", "AJ 363", "AJ 364", "AJ 715", "DET 179", "DET 181", "DET 184", "DET 185", "DET 188", "LIR 10", "AGRI 20", "AGRI 56", "AGRI 60", "AGRI 98", "AGRI 99", "AGRI 99I", "DIET 50", "DIET 55", "DIET 55L", "DIET 70", "DIET 99", "DIET 106.1", "MACH 51A", "MACH 61.2", "MACH 80A", "MACH 770", "AGBUS 2", "AGBUS 7", "AGBUS 56", "AGBUS 62", "DRD 360.1", "DRD 360.2", "DRD 363", "DRD 370.1A", "DRD 370.2A", "DRD 370.3A", "DRD 390.2", "DRD 391", "DRD 700", "DRD 705", "DRD 761", "DRD 784", "MATH 1A", "MATH 1B", "MATH 1C", "MATH 2", "MATH 4", "MATH 5", "MATH 9", "MATH 10", "MATH 15", "MATH 16", "MATH 25", "MATH 27", "MATH 49", "MATH 58", "MATH 70", "MATH 71", "MATH 101", "MATH 150A", "MATH 150B", "MATH 151", "MATH 154", "MATH 155", "MATH 770", "AGMEC 60", "ERTHS 85.1", "MEDIA 4", "MEDIA 10", "MEDIA 15", "MEDIA 19", "MEDIA 20", "MEDIA 22", "MEDIA 123", "AODS 90", "AODS 91", "ECON 1", "ECON 2", "ECON 12", "MA 163A", "MA 163AL", "MA 165", "MA 169", "ASL 1", "ASL 2", "ASL 3", "EDUC 55", "METRO 10", "METRO 10L", "ANAT 1", "ANAT 40", "ANAT 58", "ANAT 140", "ELEC 51A", "ELEC 54A", "ELEC 64A", "ELEC 153", "ELEC 156", "MICRO 5", "MICRO 60", "ANHLT 50", "ANHLT 52", "ANHLT 120", "ANHLT 121", "ANHLT 123", "ANHLT 141", "ANHLT 142", "ANHLT 151", "ANHLT 161", "EMC 100", "EMC 103", "EMC 104.1", "EMC 105", "EMC 108", "EMC 114", "EMC 116", "EMC 116.1", "EMC 118", "EMC 119", "EMC 124", "EMC 130A", "EMC 130B", "EMC 131A", "EMC 132", "MUSC 1", "MUSC 2A", "MUSC 2C", "MUSC 3A", "MUSC 3C", "MUSC 4A", "MUSC 5A", "MUSC 5B", "MUSC 6.1", "MUSC 7", "MUSC 8", "MUSC 9", "MUSC 15", "MUSC 18.3", "MUSC 50", "MUSC 51A", "MUSC 51B", "MUSC 60A", "ANSCI 20", "ANSCI 50", "ANSCI 51", "ANSCI 171", "ENGR 6", "ENGR 10", "ENGR 16", "ENGR 25", "ENGR 34", "ENGR 45", "MUSCP 11A", "MUSCP 11B", "MUSCP 11C", "MUSCP 17A", "MUSCP 17B", "MUSCP 21A", "MUSCP 21B", "MUSCP 21C", "MUSCP 21D", "MUSCP 23A", "MUSCP 23B", "MUSCP 23C", "MUSCP 23D", "MUSCP 30A", "MUSCP 30B", "MUSCP 30C", "MUSCP 30D", "MUSCP 32A", "MUSCP 32B", "MUSCP 32C", "MUSCP 32D", "MUSCP 33A", "MUSCP 33B", "MUSCP 33C", "MUSCP 33D", "MUSCP 40.1", "MUSCP 40.2", "MUSCP 40.3", "MUSCP 40.4", "MUSCP 40.5", "MUSCP 40.6", "MUSCP 40.7", "MUSCP 42A", "MUSCP 42B", "MUSCP 42C", "MUSCP 42D", "ANTHRO 1", "ANTHRO 1L", "ANTHRO 2", "ANTHRO 3", "ANTHRO 4", "ANTHRO 21", "ANTHRO 30", "ANTHRO 31", "ANTHRO 43", "ENGL 1A", "ENGL 1B", "ENGL 2", "ENGL 4A", "ENGL 4B", "ENGL 4C", "ENGL 5", "ENGL 7", "ENGL 25", "ENGL 30.1", "ENGL 33", "ENGL 46.1", "ENGL 49", "ENGL 100", "ENGL 305.1", "ENGL 307", "ENGL 309", "ENGL 770", "NRM 12", "NRM 51", "NRM 56", "NRM 67", "NRM 87", "NRM 99I", "NRM 142", "APTECH 43", "APTECH 45", "APTECH 46", "APTECH 64", "APTECH 191", "ESL 100", "ESL 317GR", "ESL 332", "ESL 334", "ESL 371", "ESL 371A", "ESL 371CP", "ESL 372", "ESL 372CP", "ESL 373", "ESL 373CP", "ESL 701", "ESL 712", "ESL 713", "ESL 713CP", "ESL 714", "ESL 714CP", "ESL 714RW", "ESL 715", "ESL 716", "ESL 716CP", "ESL 716RW", "ESL 722", "ESL 732", "ESL 770", "ESL 781", "ESL 781A", "NRA 150A", "NRA 150B", "ARCH 2.3", "ENVS 12", "NR 75B", "NR 75C", "NR 75D", "NR 75.1A", "ART 1.1", "ART 1.2", "ART 2.1", "ART 2.2", "ART 2.3", "ART 3", "ART 4", "ART 5", "ART 7A", "ART 7B", "ART 12", "ART 14A", "ART 14B", "ART 14C", "ART 19", "ART 21", "ART 23", "ART 24", "ART 27A", "ART 27B", "ART 28A", "ART 28B", "ART 28C", "ART 31A", "ART 31B", "ART 31C", "ART 31D", "ART 33A", "ART 33B", "ART 49", "ART 60A", "ART 75", "ART 82", "EQSCI 25", "EQSCI 101", "EQSCI 102A", "EQSCI 120", "EQSCI 170", "NRV 51", "NRV 51L", "NRV 58A", "ASTRON 3", "ASTRON 3L", "ASTRON 4", "ASTRON 4L", "ASTRON 12", "FASH 8", "FASH 52.2", "FASH 56A", "FASH 62A", "FASH 70A", "FASH 70B", "OA 501", "OA 502", "OA 505", "OA 507", "OA 581", "ATHL 1", "ATHL 3", "ATHL 8", "ATHL 9", "ATHL 10", "ATHL 11L", "ATHL 13", "ATHL 14", "ATHL 15L", "ATHL 17", "ATHL 18", "ATHL 21", "ATHL 22.1L", "ATHL 22.2L", "ATHL 27", "ATHL 28", "ATHL 29L", "ATHL 31L", "ATHL 45", "ATHL 45L", "FIRE 71", "FIRE 72", "FIRE 73", "FIRE 74", "FIRE 76", "FIRE 77", "FIRE 78", "FIRE 99I", "FIRE 107A", "FIRE 200.3", "FIRE 201", "FIRE 206", "FIRE 208", "FIRE 208.1", "FIRE 708", "PLS 50", "PLS 51", "PLS 53", "PLS 55", "PLS 60", "PLS 62", "PLS 99I", "AUTO 51", "AUTO 53", "AUTO 54", "AUTO 80", "AUTO 99", "AUTO 108", "AUTO 120", "AUTO 125", "AUTO 153", "AUTO 156", "AUTO 194", "FLORS 83A", "FLORS 83B", "FLORS 114", "FLORS 183C", "PHARM 102", "PHARM 103", "PHARM 151", "PHARM 152", "PHARM 154A", "PHARM 255", "BEHSC 49", "FDNT 10", "FDNT 60", "FDNT 62", "FDNT 70", "FDNT 162", "PHIL 3", "PHIL 5", "PHIL 6", "PHIL 7", "PHIL 8", "PHIL 9", "PHIL 11", "PHIL 20", "BIO 2.1", "BIO 2.2", "BIO 2.3", "BIO 10", "BIO 12", "BIO 13", "BIO 16", "BIO 25", "BIO 49", "BIO 100", "FREN 1", "FREN 2", "FREN 3", "PHYS 1", "PHYS 11", "PHYS 20", "PHYS 20L", "PHYS 21", "PHYS 21L", "PHYS 40", "PHYS 41", "PHYS 42", "PHYS 43", "PHYS 49", "BOTANY 10", "GIS 40", "PHYSIO 1", "PHYSIO 58", "BAD 1", "BAD 2", "BAD 10", "BAD 18", "BAD 52", "BAD 53", "BAD 55", "BAD 59", "BAD 98", "BAD 99", "GEOG 3", "GEOG 4", "GEOG 7", "POLS 1", "POLS 2", "BBK 50", "BBK 53.1", "BBK 53.2", "GEOL 1", "GEOL 1L", "GEOL 20", "PSYCH 1A", "PSYCH 1B", "PSYCH 3", "PSYCH 4", "PSYCH 5", "PSYCH 7", "PSYCH 8", "PSYCH 30", "PSYCH 34", "PSYCH 56", "BGN 71", "BGN 81", "BGN 101", "BGN 102", "BGN 110", "BGN 111", "BGN 112", "BGN 201", "BGN 203", "BGN 204", "BGN 205", "GERM 1", "GERM 2", "GERM 3", "RADT 60", "RADT 61A", "RADT61.1AL", "RADT 62AL", "RADT 63B", "RADT 64", "RADT 64L", "RADT 98", "RADT 100", "BMG 52", "BMG 53", "BMG 61", "BMG 62.1", "BMG 62.4", "BMG 63.1", "BMG 66.4", "BMG 100", "BMG 104", "BMG 105", "GD 15", "GD 20", "GD 51", "GD 53", "GD 54", "GD 55", "GD 63", "GD 72", "RE 50", "RE 51", "RE 52", "RE 53", "BMK 50", "BMK 51", "BMK 54", "BMK 57", "BMK 59", "BMK 60", "HLC 121", "HLC 121L", "HLC 140", "HLC 160", "RELS 1", "RELS 3", "RELS 6.66", "RELS 8", "RELS 21", "BOT 85.1", "BOT 99.1I", "BOT 99.2I", "BOT 99.3I", "BOT 154", "HLE 5", "HLE 6", "SOC 1", "SOC 2", "SOC 3", "SOC 5", "SOC 10", "SOC 30", "CHEM 1A", "CHEM 1B", "CHEM 8", "CHEM 12A", "CHEM 42", "CHEM 49", "CHEM 60", "CHEM 100", "HIST 1.1", "HIST 1.2", "HIST 4.1", "HIST 4.2", "HIST 8.1", "HIST 17.1", "HIST 17.2", "HIST 18.1", "HIST 18.2", "HIST 20", "HIST 21", "HIST 22", "HIST 26", "HIST 30", "SPAN 1", "SPAN 2", "SPAN 3", "SPAN 4", "SPAN 40", "SPAN 50A", "SPAN 50B", "CHLD 10", "CHLD 51", "CHLD 53", "CHLD 55.6", "CHLD 66", "CHLD 66.1", "CHLD 68", "CHLD 79.4", "CHLD 90.1", "CHLD 90.2", "CHLD 90.3", "CHLD 90.4", "CHLD 160.1", "CHLD 217.1", "CHLD 220", "CHLD 711", "HORT 8", "HORT 50.1", "HORT 50.2", "HORT 65", "HORT 71", "HORT 91", "HORT 181", "SE 580", "SE 712", "CEST 51", "CEST 65", "CEST 99I", "CEST 192", "HOSP 50", "HOSP 53", "HOSP 54", "HOSP 80", "SPCH 1A", "SPCH 2", "SPCH 3A", "SPCH 9", "SPCH 52A", "SPCH 52B", "SPCH 52C", "SPCH 52D", "SPCH 60", "CSKLS 312", "CSKLS312.2", "CSKLS 313", "CSKLS 334", "CSKLS367.1", "CSKLS367.2", "CSKLS 371", "CSKLS 372", "CSKLS 731", "CSKLS 732", "CSKLS 733", "CSKLS 770", "HR 60", "HR 61", "HR 62", "HR 63", "HR 64", "HR 65", "SURV 60", "COMM 5", "COMM 6", "COMM 7", "COMM 10", "COMM 98", "HUMAN 4.1", "HUMAN 5", "HUMAN 6", "HUMAN 7", "HUMAN 8", "HUMAN 21", "SUSAG 50", "SUSAG 65", "SUSAG 160", "CHW 151", "CHW 151L", "CHW 154", "CHW 155", "IED 190", "THAR 1", "THAR 2", "THAR 6", "THAR 10A", "THAR 10B", "THAR 11.1", "THAR 11.2", "THAR 11.3", "THAR 11.4", "THAR 13.2A", "THAR13.2AL", "THAR 13.2B", "THAR13.2BL", "THAR 19", "THAR 20", "THAR 21A", "THAR 21B", "THAR 22", "THAR 24", "THAR 25", "THAR 25.1", "THAR 25.2", "THAR 25.3", "THAR 25.4", "THAR 25.5", "THAR 27", "THAR 49", "THAR 50", "THAR 50L", "THAR 121.2", "THAR 127.2", "CI 51", "CI 53", "CI 54", "INTDIS 2", "INTDIS 90", "VIT 1", "VIT 51", "VIT 55", "VIT 60", "CS 5", "CS 10", "CS 11", "CS 12", "CS 49", "CS 50A", "CS 50B", "CS 50.21", "CS 55.11", "CS 57.11", "CS 60.11A", "CS 60.11B", "CS 61.11A", "CS 61.11B", "CS 62.11A", "CS 62.11B", "CS 63.11A", "CS 63.11B", "CS 65.11", "CS 70.11A", "CS 70.11B", "CS 70.13", "CS 71.11", "CS 72.11A", "CS 72.11C", "CS 74.11", "CS 74.21A", "CS 74.21B", "CS 78.1", "CS 80.11", "CS 80.15", "CS 81.21", "CS 81.62", "CS 82.21A", "CS 82.21B", "CS 82.56", "CS 84.13", "CS 98", "CS 99I", "CS 165.31", "CS 167.11", "CS 175.11", "INDE 20", "INDE 50", "INDE 52", "INDE 63", "INDE 136", "VE 713", "CONS 62", "CONS 183", "ITAL 1", "ITAL 2", "ITAL 3", "ITAL 4", "WWTR 112", "WWTR 120", "WWTR 123", "COUN 10", "COUN 20", "COUN 53", "COUN 60", "COUN 62", "COUN 74", "COUN 80", "COUN 87", "COUN 90", "COUN 91", "COUN 93", "COUN 96", "COUN 98", "COUN 99I", "COUN 162.1", "COUN 270", "COUN 355", "COUN 390", "JOUR 1", "JOUR 1L", "JOUR 52A", "JOUR 52B", "JOUR 52C", "JOUR 52D", "JOUR 54", "JOUR 55", "WTR 101", "WTR 103", "WTR 110", "CUL 98", "CUL 99I", "CUL 250", "CUL 250.1", "CUL 250.2", "CUL 250.3", "CUL 252.3", "CUL 252.14", "CUL 253A", "CUL 253B", "CUL 253.6", "CUL 253.7", "CUL 254", "CUL 254.4", "CUL 255", "CUL 255.1", "CUL 256", "CUL 256.3", "CUL 256.5", "CUL 256.8", "CUL 256.9", "CUL 256.11", "KAQUA 1.1", "KAQUA 1.2", "KAQUA 1.3", "KAQUA 2.3", "KAQUA 3.1", "KAQUA 3.2", "WELD 70", "WELD 171.1", "WELD 171.2", "WELD 171.3", "WELD 175A", "WELD 175B", "DANCE 2", "DANCE 3.1", "DANCE 10.1", "DANCE 10.2", "DANCE 11.1", "DANCE 11.2", "DANCE 11.3", "DANCE 11.4", "DANCE 13.1", "DANCE 13.2", "DANCE 13.3", "DANCE 14.2", "DANCE 14.3", "DANCE 14.4", "DANCE 16.1", "DANCE 16.2", "DANCE 16.3", "DANCE 16.4", "DANCE 16.5", "DANCE 16.6", "DANCE 21.1", "DANCE 21.2", "DANCE 21.3", "DANCE 21.4", "DANCE 21.5", "DANCE 21.6", "DANCE 29", "KCOMB 1.4", "KCOMB 2.1", "KCOMB 2.2", "KCOMB 2.3", "KCOMB 4.1", "KCOMB 4.2", "KCOMB 5.1", "KCOMB 7.3", "KCOMB 10", "WINE 1", "WINE 3", "WINE 42.1", "WINE 70", "WINE 102", "WINE 105", "WINE 110", "WINE 116", "WINE 124", "DE 50", "DE 51", "DE 55A", "KFIT 1.1", "KFIT 1.2", "KFIT 3.1", "KFIT 3.2", "KFIT 3.3", "KFIT 5.1", "KFIT 5.2", "KFIT 6.1", "KFIT 6.2", "KFIT 7.1", "KFIT 8.1", "KFIT 8.2", "KFIT 10.1", "KFIT 11.1", "KFIT 16.1", "KFIT 21.1", "KFIT 30.1", "KFIT 31.1", "KFIT 32.1", "KFIT 35.1", "KFIT 36.1", "KFIT 37.1", "KFIT 50", "WRKEX 97", "DA 60", "DA 61", "DA 62", "DA 69", "KINDV 2.1", "KINDV 2.2", "KINDV 3.1", "KINDV 3.2", "KINDV 4.1", "KINDV 4.2", "WEOC 99", "WEOC 99I", "DNA 299.4", "KINES 1", "KINES 4", "KINES 5", "KINES 21", "KINES 49", "KINES 53", "KINES 55", "KINES 59", "KINES 62A", "KINES 62B", "KINES 62C", "KINES 62D", "KINES 63", "KINES 80", "KINES 81", "KINES 83"
-	];
+			"ADLTED 614","ADLTED 721","ADLTED 722","ADLTED 731.2","ADLTED 731.3","ADLTED 742.1","ADLTED 743","ADLTED 744","ADLTED 746","ADLTED 751","ADLTED 752","ADLTED 761.1","ADLTED 761.2","ADLTED 761.4","ADLTED 761.5","ADLTED 764","ADLTED 791","ADLTED 792","AGBUS 2","AGMEC 50","AGRI 20","AGRI 56","AGRI 60","AGRI 98","AGRI 99","AGRI 99I","AJ 203","AJ 203A","AJ 203B","AJ 21","AJ 22","AJ 223","AJ 25","AJ 343","AJ 348","AJ 350","AJ 351","AJ 353","AJ 354","AJ 355","AJ 361","AJ 363","AJ 364","AJ 380.3","AJ 53","AJ 54A","AJ 55","AJ 56","AJ 70","AJ 715","AJ 99I","ANAT 1","ANAT 140","ANAT 40","ANAT 58","ANHLT 109","ANHLT 120","ANHLT 121","ANHLT 122","ANHLT 122L","ANHLT 126","ANHLT 141","ANHLT 142","ANHLT 151","ANHLT 50","ANHLT 52","ANSCI 2","ANSCI 20","ANSCI 27","ANSCI 61","ANTHRO 1","ANTHRO 19","ANTHRO 1L","ANTHRO 2","ANTHRO 21","ANTHRO 3","ANTHRO 30","ANTHRO 31","ANTHRO 4","ANTHRO 43","AODS 90","AODS 91","APE 301","APE 701","APE 709","APE 710","APTECH 168","APTECH 191","APTECH 43","APTECH 45","APTECH 46","APTECH 64","ARCH 12","ARCH 2.3","ARCH 60","ARCH 65","ART 1.1","ART 1.2","ART 112A","ART 112B","ART 12","ART 14A","ART 14B","ART 14C","ART 19","ART 2.1","ART 2.2","ART 2.3","ART 21","ART 22","ART 24","ART 27A","ART 27B","ART 28A","ART 28B","ART 28C","ART 3","ART 31A","ART 31B","ART 31C","ART 31D","ART 33A","ART 33B","ART 4","ART 43","ART 49","ART 5","ART 53","ART 75","ART 7A","ART 7B","ART 82","ASL 1","ASL 2","ASL 3","ASL 56","ASTRON 12","ASTRON 3","ASTRON 3L","ASTRON 4","ASTRON 4L","ATHL 1","ATHL 10","ATHL 11L","ATHL 13","ATHL 14","ATHL 15L","ATHL 17","ATHL 18","ATHL 21","ATHL 22.1L","ATHL 22.2L","ATHL 27","ATHL 28","ATHL 29L","ATHL 3","ATHL 45","ATHL 45L","ATHL 8","ATHL 9","AUTO 120","AUTO 126","AUTO 151","AUTO 154","AUTO 155","AUTO 156","AUTO 194","AUTO 80","AUTO 99","BAD 1","BAD 10","BAD 101","BAD 18","BAD 2","BAD 52","BAD 53","BAD 59","BAD 99","BBK 50","BBK 52.1","BBK 53.1","BBK 53.2","BEHSC 49","BGN 100","BGN 101","BGN 102","BGN 110","BGN 111","BGN 112","BGN 156","BGN 201","BGN 203","BGN 71","BGN 81","BIO 10","BIO 100","BIO 12","BIO 13","BIO 16","BIO 2.1","BIO 2.2","BIO 2.3","BIO 27","BIO 49","BIO 85.1","BMG 52","BMG 53","BMG 61","BMG 62.1","BMG 62.4","BMG 63.1","BMG 66.4","BMK 155","BMK 50","BMK 51","BMK 54","BMK 57","BMK 59","BOT 770","BOT 85.1","BOT 99.1I","BOT 99.2I","BOT 99.3I","BOTANY 10","BREW 100","BREW 112","CEST 192","CEST 51","CEST 65","CHEM 100","CHEM 12A","CHEM 1A","CHEM 1B","CHEM 42","CHEM 49","CHEM 60","CHIN 1","CHLD 10","CHLD 160.1","CHLD 185.1","CHLD 185.2","CHLD 220","CHLD 51","CHLD 53B","CHLD 66","CHLD 68","CHLD 79.2","CHLD 90.1","CHLD 90.2","CHLD 90.3","CHLD 90.4","CI 51","CI 53","CI 54","COMM 1","COMM 10","COMM 3","COMM 49","COMM 5","COMM 52A","COMM 52B","COMM 52C","COMM 52D","COMM 6","COMM 60","COMM 7","COMM 9","COMM 98","CONS 62","CONS 70A","CONS 98","COUN 10","COUN 270","COUN 390","COUN 53","COUN 6","COUN 60","COUN 74","COUN 80","COUN 87","COUN 90","COUN 91","COUN 93","COUN 96","COUN 98","COUN 99I","CS 10A","CS 10B","CS 10C","CS 110A","CS 12","CS 165.31","CS 167.11","CS 17.11","CS 49","CS 5","CS 50A","CS 50B","CS 50C","CS 60.11A","CS 60.11B","CS 61.11A","CS 61.11B","CS 62.11A","CS 62.11B","CS 63.11A","CS 63.11B","CS 65.11","CS 70.11A","CS 70.11B","CS 71.11","CS 72.11A","CS 74.11","CS 74.21A","CS 74.21B","CS 74.40","CS 74.41","CS 74.42","CS 76.11","CS 78.1A","CS 80.11","CS 80.15","CS 81.21","CS 82.21A","CS 82.21B","CS 84.13","CS 84.21","CS 98","CS 99I","CSKLS 312","CSKLS 313","CSKLS 334","CSKLS 373","CSKLS 731","CSKLS 732","CSKLS 733","CSKLS 770","CSKLS312.2","CSKLS312.3","CSKLS367.1","CSKLS367.2","CUL 250","CUL 250.1","CUL 250.2","CUL 250.3","CUL 252.14","CUL 252.3","CUL 253.6","CUL 253.7","CUL 253A","CUL 253B","CUL 254","CUL 254.4","CUL 255","CUL 255.1","CUL 256","CUL 256.8","CUL 256.9","CUL 264.1","CUL 275.11","CUL 275.17","CUL 275.67","CUL 286.3","CUL 98","CUL 99I","DA 60","DA 62","DANCE 10.2","DANCE 11.1","DANCE 11.2","DANCE 11.3","DANCE 11.4","DANCE 11.5","DANCE 11.6","DANCE 13.1","DANCE 13.2","DANCE 13.3","DANCE 14.1","DANCE 14.2","DANCE 14.3","DANCE 14.4","DANCE 16.1","DANCE 16.2","DANCE 16.3","DANCE 16.4","DANCE 16.5","DANCE 16.6","DANCE 2","DANCE 21.1","DANCE 21.2","DANCE 21.3","DANCE 21.4","DANCE 21.5","DANCE 21.6","DANCE 3.1","DANCE 88.1","DANCE 88.2","DE 50","DE 51","DE 55A","DET 179","DET 181","DET 184","DET 185","DET 188","DH 68","DH 69","DH 70","DH 71A","DH 71D","DH 79","DH 80","DH 81","DIET 106.1","DIET 50","DIET 55","DIET 55L","DIET 70","DIET 99I","DRD 313","DRD 363","DRD 368.1","DRD 368.2","DRD 370.1A","DRD 370.2A","DRD 370.3A","DRD 390.2","DRD 391","DRD 700","DRD 705","DRD 761","DRD 784","ECON 1","ECON 2","ELEC 153","ELEC 184","ELEC 51A","ELEC 54A","ELEC 54C","ELEC 64A","EMC 100","EMC 103","EMC 104.1","EMC 105","EMC 108","EMC 114","EMC 116","EMC 116.1","EMC 118","EMC 119","EMC 124","EMC 131A","EMC 133A","EMC 133B","EMC 134","ENGL 100","ENGL 14","ENGL 1A","ENGL 1B","ENGL 2","ENGL 25","ENGL 30.1","ENGL 309","ENGL 36","ENGL 46.1","ENGL 49","ENGL 4A","ENGL 4B","ENGL 4C","ENGL 5","ENGL 50","ENGL 7","ENGL 770","ENGR 10","ENGR 16","ENGR 25","ENGR 34","ENGR 45","ENGR 6","ENGR 770","ENVS 12","ENVS 8","EQSCI 25","ESHIP 101","ESHIP 106","ESHIP 115","ESHIP 116","ESHIP 117","ESL 10","ESL 100","ESL 300GR","ESL 332","ESL 353","ESL 371","ESL 371B","ESL 371CP","ESL 372","ESL 372CP","ESL 373","ESL 373CP","ESL 701","ESL 712","ESL 713","ESL 713CP","ESL 714","ESL 714CP","ESL 714RW","ESL 715","ESL 716","ESL 716CP","ESL 716RW","ESL 722","ESL 732","ESL 753","ESL 770","ESL 781","ESL 781B","FASH 151","FASH 52.2","FASH 56","FASH 62A","FASH 70A","FASH 70B","FASH 770","FASH 8","FDNT 10","FDNT 60","FDNT 62","FDNT 70","FIRE 107.1","FIRE 206","FIRE 208","FIRE 208.1","FIRE 241","FIRE 708","FIRE 71","FIRE 72","FIRE 73","FIRE 74","FIRE 76","FIRE 77","FIRE 78","FIRE 99I","FLORS 114","FLORS 183C","FLORS 83A","FREN 1","FREN 2","FREN 3","FREN 50A","GD 15","GD 20","GD 51","GD 53","GD 55","GD 63","GEOG 3","GEOG 4","GEOG 7","GEOL 1","GEOL 11","GEOL 1L","GEOL 20","GERM 1","GERM 2","GERM 3","GERM 4","GIS 40","HIST 1.1","HIST 1.2","HIST 17.1","HIST 17.2","HIST 18.1","HIST 18.2","HIST 20","HIST 21","HIST 22","HIST 26","HIST 30","HIST 4.1","HIST 4.2","HIST 8.1","HLC 140","HLC 160","HLE 5","HLE 6","HORT 184","HORT 51","HORT 70","HORT 8","HORT 93","HOSP 50","HOSP 53","HOSP 54","HOSP 80","HR 60","HR 61","HR 62","HR 63","HR 64","HR 65","HR 99I","HUMAN 4.1","HUMAN 5","HUMAN 6","HUMAN 7","HUMAN 8","IED 190","INDE 20","INDE 50","INDE 52","INDE 63","INDE 71","INTDIS 2","INTDIS 90","ITAL 1","ITAL 2","ITAL 3","ITAL 4","JAPAN 1","JOUR 1","JOUR 1L","JOUR 52A","JOUR 52B","JOUR 52C","JOUR 52D","JOUR 54A","JOUR 55","KAQUA 1.1","KAQUA 1.2","KAQUA 1.3","KAQUA 1.4","KAQUA 2.1","KAQUA 21","KCOMB 1.4","KCOMB 2.1","KCOMB 2.2","KCOMB 2.3","KCOMB 4.1","KCOMB 4.2","KCOMB 5.1","KCOMB 7.2","KFIT 10.1","KFIT 11.1","KFIT 12.1","KFIT 16.1","KFIT 2.1","KFIT 2.2","KFIT 21.1","KFIT 3.1","KFIT 3.2","KFIT 3.3","KFIT 31.1","KFIT 32","KFIT 32.1","KFIT 32.2","KFIT 35.1","KFIT 36.1","KFIT 5","KFIT 5.1","KFIT 5.2","KFIT 50","KFIT 6","KFIT 6.1","KFIT 6.2","KFIT 8","KFIT 8.1","KFIT 8.2","KINDV 2.1","KINDV 2.2","KINDV 3.1","KINDV 3.2","KINDV 79.3","KINES 1","KINES 4","KINES 49","KINES 5","KINES 50","KINES 53","KINES 55","KINES 59","KINES 62A","KINES 62B","KINES 62C","KINES 62D","KINES 63","KINES 70","KINES 72","KINES 73","KINES 81","KINES 83","KTEAM 4.1","KTEAM 4.2","KTEAM 4.3","KTEAM 6.1","KTEAM 6.2","KTEAM 8.1","KTEAM 8.2","KTEAM 8.3","LIR 10","MA 163","MA 163L","MA 165","MA 169","MACH 51A","MACH 51B","MACH 770","MACH 80A","MATH 10","MATH 101","MATH 15","MATH 150","MATH 154","MATH 156","MATH 16","MATH 161","MATH 1A","MATH 1B","MATH 1C","MATH 2","MATH 215","MATH 25","MATH 27","MATH 4","MATH 49","MATH 5","MATH 58","MATH 770","MATH 9","MEDIA 10","MEDIA 14","MEDIA 19","MEDIA 20","MEDIA 4","METRO 10","MICRO 5","MICRO 60","MUSC 1","MUSC 18.1","MUSC 2A","MUSC 2C","MUSC 3A","MUSC 3C","MUSC 4A","MUSC 50","MUSC 51A","MUSC 51B","MUSC 5A","MUSC 5B","MUSC 5C","MUSC 5D","MUSC 6.1","MUSC 60A","MUSC 60B","MUSC 7","MUSC 8","MUSC 9","MUSCP 11A","MUSCP 11B","MUSCP 11C","MUSCP 11D","MUSCP 17A","MUSCP 17B","MUSCP 21A","MUSCP 21B","MUSCP 21C","MUSCP 21D","MUSCP 23A","MUSCP 23B","MUSCP 23C","MUSCP 23D","MUSCP 30A","MUSCP 30B","MUSCP 30C","MUSCP 30D","MUSCP 32A","MUSCP 32B","MUSCP 32C","MUSCP 32D","MUSCP 33A","MUSCP 33B","MUSCP 33C","MUSCP 33D","MUSCP 40.1","MUSCP 40.2","MUSCP 40.3","MUSCP 40.4","MUSCP 40.5","MUSCP 40.6","MUSCP 40.7","MUSCP 42A","MUSCP 42B","MUSCP 42C","MUSCP 42D","MUSCP19.1A","MUSCP19.1B","NR 75.1A","NR 75B","NR 75C","NR 75D","NRA 150A","NRM 12","NRM 142","NRM 51","NRM 63","NRM 88","NRM 98","NRM 99I","OA 501","OA 502","OA 505","OA 507","OA 581","PHARM 102","PHARM 103","PHARM 152","PHARM 154A","PHIL 11","PHIL 20","PHIL 3","PHIL 5","PHIL 6","PHIL 7","PHIL 9","PHYS 1","PHYS 11","PHYS 20","PHYS 20L","PHYS 21","PHYS 21L","PHYS 40","PHYS 41","PHYS 42","PHYS 43","PHYS 49","PHYSC 21","PHYSIO 1","PHYSIO 58","PLS 50","PLS 51","PLS 53","PLS 55","PLS 65","PLS 66","PLS 99I","POLS 1","POLS 2","PSYCH 11","PSYCH 1A","PSYCH 1B","PSYCH 3","PSYCH 30","PSYCH 34","PSYCH 35","PSYCH 4","PSYCH 40","PSYCH 5","PSYCH 56","PSYCH 7","PSYCH 8","PSYCH 9","RADT 60","RADT 61A","RADT 63B","RADT 64","RADT 64L","RADT 65","RADT 71A","RADT 71D","RE 50","RE 51","RE 52","RE 53","RELS 1","RELS 2","RELS 3","RELS 32","RELS 6.66","RELS 8","SE 580","SE 712","SOC 1","SOC 10","SOC 2","SOC 3","SOC 30","SOCS 49","SPAN 1","SPAN 2","SPAN 3","SPAN 4","SPAN 40","SPAN 41","SPAN 50A","SURV 60","SUSAG 160","SUSAG 50","SUSAG 65","THAR 1","THAR 10A","THAR 10B","THAR 11.1","THAR 11.2","THAR 11.3","THAR 11.4","THAR 11.5A","THAR 11.5B","THAR 121.2","THAR 127.3","THAR 13.2A","THAR 13.2B","THAR 19","THAR 2","THAR 20","THAR 21A","THAR 21B","THAR 22","THAR 24","THAR 25","THAR 25.1","THAR 25.2","THAR 25.3","THAR 25.4","THAR 25.5","THAR 27","THAR 49","THAR 50","THAR 50L","THAR13.2AL","THAR13.2BL","VE 713","VIT 1","VIT 51","VIT 55","VIT 60","WELD 170","WELD 171.1","WELD 171.2","WELD 171.3","WELD 175A","WELD 175B","WEOC 99","WEOC 99I","WINE 1","WINE 102","WINE 110","WINE 111.2","WINE 124","WINE 128","WINE 3","WINE 42.1","WINE 70","WRKEX 97","WTR 101","WTR 110","WWTR 112","WWTR 120","WWTR 123"
+	]
+	AppendGTCCourses();
 
 $("#textbox").autocomplete({
      source: function(req, responseFn) {
